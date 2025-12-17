@@ -394,6 +394,55 @@ async def list_group_apps(group_id: str, ctx: Context = None) -> list:
 
 
 @mcp.tool()
+async def list_group_owners(
+    group_id: str,
+    ctx: Context = None,
+    filter: Optional[str] = None,
+    after: Optional[str] = None,
+    limit: Optional[int] = None,
+) -> list:
+    """List all owners of a group by ID from the Okta organization.
+
+    This tool retrieves all owners of a group by its ID from the Okta organization.
+
+    Parameters:
+        group_id (str, required): The ID of the group to retrieve owners from.
+        filter (str, optional): SCIM Filter expression for group owners. Allows to filter owners by type.
+        after (str, optional): Specifies the pagination cursor for the next page of owners.
+        limit (int, optional): Specifies the number of owner results in a page.
+
+    Returns:
+        List containing the owners of the group.
+    """
+    logger.info(f"Listing owners of group: {group_id}")
+    logger.debug(f"Query parameters: filter='{filter}', after='{after}', limit={limit}")
+
+    manager = ctx.request_context.lifespan_context.okta_auth_manager
+
+    try:
+        client = await get_okta_client(manager)
+
+        logger.debug(f"Calling Okta API to list owners for group {group_id}")
+        owners, _, err = await client.list_group_owners(
+            group_id, filter=filter, after=after, limit=limit
+        )
+
+        if err:
+            logger.error(f"Okta API error while listing owners for group {group_id}: {err}")
+            return [f"Error: {err}"]
+
+        if not owners:
+            logger.info(f"No owners found for group {group_id}")
+            return []
+
+        logger.info(f"Successfully retrieved {len(owners)} owners for group {group_id}")
+        return [owner for owner in owners]
+    except Exception as e:
+        logger.error(f"Exception while listing owners for group {group_id}: {type(e).__name__}: {e}")
+        return [f"Exception: {e}"]
+
+
+@mcp.tool()
 async def add_user_to_group(group_id: str, user_id: str, ctx: Context = None) -> list:
     """Add a user to a group by ID in the Okta organization.
 

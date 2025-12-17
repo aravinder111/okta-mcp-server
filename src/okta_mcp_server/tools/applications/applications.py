@@ -315,3 +315,145 @@ async def deactivate_application(ctx: Context, app_id: str) -> list:
     except Exception as e:
         logger.error(f"Exception while deactivating application {app_id}: {type(e).__name__}: {e}")
         return [f"Exception: {e}"]
+
+
+@mcp.tool()
+async def list_application_users(
+    ctx: Context,
+    app_id: str,
+    q: Optional[str] = None,
+    query_scope: Optional[str] = None,
+    after: Optional[str] = None,
+    limit: Optional[int] = None,
+    filter: Optional[str] = None,
+    expand: Optional[str] = None,
+) -> list:
+    """List all assigned users for an application in the Okta organization.
+
+    Parameters:
+        app_id (str, required): The ID of the application
+        q (str, optional): Searches for users by name, email, or login
+        query_scope (str, optional): Specifies the scope of the query
+        after (str, optional): Specifies the pagination cursor for the next page of results
+        limit (int, optional): Specifies the number of results per page (min 20, max 100)
+        filter (str, optional): Filters users by status or other criteria
+        expand (str, optional): Expands the app user object to include the user's profile
+
+    Returns:
+        List containing the assigned users for the application.
+    """
+    logger.info(f"Listing users assigned to application: {app_id}")
+    logger.debug(f"Query parameters: q='{q}', filter='{filter}', limit={limit}")
+
+    # Validate limit parameter range
+    if limit is not None:
+        if limit < 20:
+            logger.warning(f"Limit {limit} is below minimum (20), setting to 20")
+            limit = 20
+        elif limit > 100:
+            logger.warning(f"Limit {limit} exceeds maximum (100), setting to 100")
+            limit = 100
+
+    manager = ctx.request_context.lifespan_context.okta_auth_manager
+
+    try:
+        client = await get_okta_client(manager)
+        query_params = {}
+
+        if q:
+            query_params["q"] = q
+        if query_scope:
+            query_params["queryScope"] = query_scope
+        if after:
+            query_params["after"] = after
+        if limit:
+            query_params["limit"] = limit
+        if filter:
+            query_params["filter"] = filter
+        if expand:
+            query_params["expand"] = expand
+
+        logger.debug(f"Calling Okta API to list users for application {app_id}")
+        app_users, _, err = await client.list_application_users(app_id, query_params)
+
+        if err:
+            logger.error(f"Okta API error while listing application users for {app_id}: {err}")
+            return [f"Error: {err}"]
+
+        if not app_users:
+            logger.info(f"No users found assigned to application {app_id}")
+            return []
+
+        logger.info(f"Successfully retrieved {len(app_users)} users assigned to application {app_id}")
+        return [app_user for app_user in app_users]
+    except Exception as e:
+        logger.error(f"Exception while listing application users for {app_id}: {type(e).__name__}: {e}")
+        return [f"Exception: {e}"]
+
+
+@mcp.tool()
+async def list_app_group_assignments(
+    ctx: Context,
+    app_id: str,
+    q: Optional[str] = None,
+    after: Optional[str] = None,
+    limit: Optional[int] = None,
+    expand: Optional[str] = None,
+) -> list:
+    """List all assigned groups for an application in the Okta organization.
+
+    Parameters:
+        app_id (str, required): The ID of the application
+        q (str, optional): Searches for groups by name or description
+        after (str, optional): Specifies the pagination cursor for the next page of results
+        limit (int, optional): Specifies the number of results per page (min 20, max 100)
+        expand (str, optional): Expands the app group object to include the group's profile
+
+    Returns:
+        List containing the assigned groups for the application.
+    """
+    logger.info(f"Listing groups assigned to application: {app_id}")
+    logger.debug(f"Query parameters: q='{q}', limit={limit}")
+
+    # Validate limit parameter range
+    if limit is not None:
+        if limit < 20:
+            logger.warning(f"Limit {limit} is below minimum (20), setting to 20")
+            limit = 20
+        elif limit > 100:
+            logger.warning(f"Limit {limit} exceeds maximum (100), setting to 100")
+            limit = 100
+
+    manager = ctx.request_context.lifespan_context.okta_auth_manager
+
+    try:
+        client = await get_okta_client(manager)
+        query_params = {}
+
+        if q:
+            query_params["q"] = q
+        if after:
+            query_params["after"] = after
+        if limit:
+            query_params["limit"] = limit
+        if expand:
+            query_params["expand"] = expand
+
+        logger.debug(f"Calling Okta API to list group assignments for application {app_id}")
+        group_assignments, _, err = await client.list_application_group_assignments(app_id, query_params)
+
+        if err:
+            logger.error(f"Okta API error while listing application group assignments for {app_id}: {err}")
+            return [f"Error: {err}"]
+
+        if not group_assignments:
+            logger.info(f"No groups found assigned to application {app_id}")
+            return []
+
+        logger.info(f"Successfully retrieved {len(group_assignments)} group assignments for application {app_id}")
+        return [group_assignment for group_assignment in group_assignments]
+    except Exception as e:
+        logger.error(
+            f"Exception while listing application group assignments for {app_id}: {type(e).__name__}: {e}"
+        )
+        return [f"Exception: {e}"]
